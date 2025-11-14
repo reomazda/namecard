@@ -114,10 +114,20 @@ export async function POST(request: NextRequest) {
       message: 'Business card uploaded successfully'
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing business card:', error);
+
+    // Log detailed error for debugging
+    if (error.message) console.error('Error message:', error.message);
+    if (error.stack) console.error('Error stack:', error.stack);
+    if (error.$metadata) console.error('AWS Error metadata:', error.$metadata);
+
     return NextResponse.json(
-      { error: 'Failed to process business card' },
+      {
+        error: 'Failed to process business card',
+        details: error.message || 'Unknown error',
+        type: error.name || 'UnknownError'
+      },
       { status: 500 }
     );
   }

@@ -141,7 +141,15 @@ export default function Dashboard() {
         setOcrProgress('');
         alert('名刺が正常にアップロードされました！');
       } else {
-        alert('アップロードに失敗しました');
+        const errorDetails = [
+          'アップロードに失敗しました',
+          data.error ? `エラー: ${data.error}` : '',
+          data.details ? `詳細: ${data.details}` : '',
+          data.type ? `タイプ: ${data.type}` : ''
+        ].filter(Boolean).join('\n');
+
+        console.error('Upload failed:', data);
+        alert(errorDetails);
       }
     } catch (error) {
       console.error('Error uploading card:', error);
