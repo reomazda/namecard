@@ -92,8 +92,8 @@ JSONのみを返してください。追加の説明は不要です。`,
           ],
         },
       ],
-      // Limit output length; GPT-5.1 ignores temperature/top_p
-      max_tokens: 1000,
+      // Limit output length for GPT-5.1 chat completions
+      max_completion_tokens: 1000,
     });
 
     const content = response.choices[0]?.message?.content || '{}';
