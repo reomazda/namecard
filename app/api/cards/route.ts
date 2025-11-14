@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         Key: filename,
         Body: buffer,
         ContentType: file.type,
-        ACL: 'public-read', // Make uploaded images publicly accessible
+        // Note: ACL removed - bucket policy controls public access instead
       })
     );
 
