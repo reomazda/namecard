@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import heic2any from 'heic2any';
 
 interface BusinessCard {
   id: string;
@@ -63,6 +62,9 @@ export default function Dashboard() {
           file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
         setOcrProgress('HEIC画像をJPEGに変換中...');
         try {
+          // Dynamically import heic2any only when needed (client-side only)
+          const heic2any = (await import('heic2any')).default;
+
           const convertedBlob = await heic2any({
             blob: file,
             toType: 'image/jpeg',
