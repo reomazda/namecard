@@ -58,7 +58,7 @@ export default function Dashboard() {
   // Resize image to speed up OCR
   const resizeImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
-      const img = new Image();
+      const img = document.createElement('img');
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
 
