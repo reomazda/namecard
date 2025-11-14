@@ -86,7 +86,7 @@ export default function Dashboard() {
         }
       }
 
-      setOcrProgress('GPT-5 miniで名刺を解析中...');
+      setOcrProgress('GPT-5 nanoで名刺を解析中...');
 
       // Call OpenAI OCR API
       const ocrFormData = new FormData();
