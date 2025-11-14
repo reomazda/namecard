@@ -55,7 +55,7 @@ export default function Dashboard() {
     if (!file) return;
 
     setIsUploading(true);
-    setOcrProgress('GPT-5で名刺を解析中...');
+    setOcrProgress('GPT-5 miniで名刺を解析中...');
 
     try {
       // Call OpenAI OCR API

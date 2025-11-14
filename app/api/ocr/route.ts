@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${file.type};base64,${base64Image}`;
 
-    // Call OpenAI Vision API with GPT-5
+    // Call OpenAI Vision API with GPT-5 mini
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.1-2025-11-13',
+      model: 'gpt-5-mini',
       messages: [
         {
           role: 'user',
