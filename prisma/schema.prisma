@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  username  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cards     BusinessCard[]
+  tags      Tag[]
+}
+
+model BusinessCard {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  fullName    String?
+  companyName String?
+  department  String?
+  position    String?
+  email       String?
+  phone       String?
+  mobile      String?
+  fax         String?
+  address     String?
+  website     String?
+  imagePath   String?
+  rawText     String?
+  ocrJson     String?
+  fingerprint String?  @unique
+  notes       String?
+  isShared    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tags        CardTag[]
+
+  @@index([ownerId])
+  @@index([fullName])
+  @@index([companyName])
+  @@index([email])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  cards     CardTag[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+}
+
+model CardTag {
+  cardId String
+  tagId  String
+  card   BusinessCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  tag    Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, tagId])
+}

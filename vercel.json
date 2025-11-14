@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build && npx prisma generate",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["hnd1"],
+  "env": {
+    "APP_PASSWORD": "@app_password"
+  }
+}
