@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@/lib/prisma';
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  },
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,20 +34,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save the uploaded image
+    // Upload image to S3
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadsDir, { recursive: true });
-
-    // Generate unique filename
     const timestamp = Date.now();
-    const filename = `${timestamp}-${file.name}`;
-    const filepath = join(uploadsDir, filename);
+    const filename = `cards/${timestamp}-${file.name}`;
+    const bucketName = process.env.AWS_S3_BUCKET_NAME;
 
-    await writeFile(filepath, buffer);
+    if (!bucketName) {
+      return NextResponse.json(
+        { error: 'S3 bucket not configured' },
+        { status: 500 }
+      );
+    }
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: filename,
+        Body: buffer,
+        ContentType: file.type,
+      })
+    );
+
+    // Generate public URL for the uploaded image
+    const imageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${filename}`;
 
     // For MVP, we'll use a default user ID
     // In production, this would come from the authenticated session
@@ -58,7 +77,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Save business card to database
+    // Save business card to database with S3 image URL
     const card = await prisma.businessCard.create({
       data: {
         ownerId: user.id,
@@ -71,7 +90,7 @@ export async function POST(request: NextRequest) {
         mobile: mobile || undefined,
         address: address || undefined,
         website: website || undefined,
-        imagePath: `/uploads/${filename}`,
+        imagePath: imageUrl,
         rawText: rawText || undefined,
         ocrJson: JSON.stringify({
           fullName,

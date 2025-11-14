@@ -21,7 +21,44 @@
 3. `[YOUR-PASSWORD]` を実際のパスワードに置き換える
 4. 接続文字列をコピー（例: `postgresql://postgres:[YOUR-PASSWORD]@db.xxx.supabase.co:5432/postgres`）
 
-## ステップ3: Vercelでデプロイ
+## ステップ3: AWS S3バケットを作成
+
+1. https://console.aws.amazon.com/s3 にアクセス
+2. 「バケットを作成」をクリック
+3. バケット名を入力（例: cardconnect-images-your-name）
+4. リージョンを選択（例: ap-northeast-1 Tokyo）
+5. 「ACL を有効にする」を選択
+6. 「パブリックアクセスをブロック」を**すべてオフ**にする（画像を公開アクセス可能にするため）
+7. 「バケットを作成」をクリック
+8. 作成したバケットを開き、「アクセス許可」タブ→「バケットポリシー」で以下を追加:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    }
+  ]
+}
+```
+
+（`your-bucket-name`を実際のバケット名に置き換える）
+
+9. IAMユーザーを作成してアクセスキーを取得:
+   - https://console.aws.amazon.com/iam にアクセス
+   - 「ユーザー」→「ユーザーを追加」
+   - ユーザー名を入力（例: cardconnect-uploader）
+   - 「アクセスキー - プログラムによるアクセス」を選択
+   - 「既存のポリシーを直接アタッチ」→「AmazonS3FullAccess」を選択
+   - 「次へ」→「ユーザーの作成」
+   - アクセスキーIDとシークレットアクセスキーをメモ
+
+## ステップ4: Vercelでデプロイ
 
 1. https://vercel.com にログイン
 2. 「New Project」をクリック
@@ -29,9 +66,13 @@
 4. 「Environment Variables」に以下を追加:
    - `DATABASE_URL` = Supabaseの接続文字列（ステップ2でコピーしたもの）
    - `APP_PASSWORD` = ログイン用パスワード（例: cardconnect2025）
+   - `AWS_ACCESS_KEY_ID` = IAMユーザーのアクセスキーID
+   - `AWS_SECRET_ACCESS_KEY` = IAMユーザーのシークレットアクセスキー
+   - `AWS_REGION` = S3バケットのリージョン（例: ap-northeast-1）
+   - `AWS_S3_BUCKET_NAME` = S3バケット名（例: cardconnect-images-your-name）
 5. 「Deploy」をクリック
 
-## ステップ4: マイグレーションの実行
+## ステップ5: マイグレーションの実行
 
 デプロイが完了したら、自動的にPrismaのマイグレーションが実行されます（`npm run build`スクリプトに含まれています）。
 
@@ -63,7 +104,7 @@ npx prisma migrate deploy
 vercel --prod
 ```
 
-## ステップ5: 動作確認
+## ステップ6: 動作確認
 
 1. VercelのURLにアクセス（例: https://cardconnect.vercel.app）
 2. ログインページが表示されることを確認
@@ -111,6 +152,10 @@ Vercelでは `/public` ディレクトリが読み取り専用です。大量の
 |--------|------|-----|
 | `DATABASE_URL` | Supabase PostgreSQL接続文字列 | `postgresql://postgres:password@db.xxx.supabase.co:5432/postgres` |
 | `APP_PASSWORD` | アプリログイン用パスワード | `cardconnect2025` |
+| `AWS_ACCESS_KEY_ID` | AWS IAMアクセスキーID | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAMシークレットアクセスキー | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `AWS_REGION` | S3バケットのリージョン | `ap-northeast-1` |
+| `AWS_S3_BUCKET_NAME` | S3バケット名 | `cardconnect-images-your-name` |
 
 ## 参考リンク
 
