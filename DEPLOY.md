@@ -86,6 +86,7 @@
 4. 「Environment Variables」に以下を追加:
    - `DATABASE_URL` = Supabaseの接続文字列（ステップ2でコピーしたもの）
    - `APP_PASSWORD` = ログイン用パスワード（例: cardconnect2025）
+   - `OPENAI_API_KEY` = OpenAI APIキー（sk-proj-で始まる文字列）
    - `AWS_ACCESS_KEY_ID` = IAMユーザーのアクセスキーID
    - `AWS_SECRET_ACCESS_KEY` = IAMユーザーのシークレットアクセスキー
    - `AWS_REGION` = S3バケットのリージョン（例: ap-northeast-1）
@@ -188,6 +189,7 @@ Vercelでは `/public` ディレクトリが読み取り専用です。大量の
 |--------|------|-----|
 | `DATABASE_URL` | Supabase PostgreSQL接続文字列 | `postgresql://postgres:password@db.xxx.supabase.co:5432/postgres` |
 | `APP_PASSWORD` | アプリログイン用パスワード | `cardconnect2025` |
+| `OPENAI_API_KEY` | OpenAI APIキー（GPT-4o Vision使用） | `sk-proj-xxxxxxxxxxxxx` |
 | `AWS_ACCESS_KEY_ID` | AWS IAMアクセスキーID | `AKIAIOSFODNN7EXAMPLE` |
 | `AWS_SECRET_ACCESS_KEY` | AWS IAMシークレットアクセスキー | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | `AWS_REGION` | S3バケットのリージョン | `ap-northeast-1` |

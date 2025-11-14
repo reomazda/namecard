@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { createWorker } from 'tesseract.js';
-import { extractBusinessCardInfo } from '@/lib/extract-card-info';
 
 interface BusinessCard {
   id: string;
@@ -21,9 +19,6 @@ interface BusinessCard {
   notes?: string;
   createdAt: string;
 }
-
-// Global worker cache for faster OCR
-let cachedWorker: any = null;
 
 export default function Dashboard() {
   const [cards, setCards] = useState<BusinessCard[]>([]);
@@ -55,61 +50,31 @@ export default function Dashboard() {
     }
   };
 
-  // Resize image to speed up OCR
-  const resizeImage = async (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const img = document.createElement('img');
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-
-      img.onload = () => {
-        // Resize to max 1600px width (maintains aspect ratio)
-        const maxWidth = 1600;
-        const scale = Math.min(1, maxWidth / img.width);
-
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          resolve(blob || file);
-        }, 'image/jpeg', 0.9);
-      };
-
-      img.src = URL.createObjectURL(file);
-    });
-  };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    setOcrProgress('画像を最適化中...');
+    setOcrProgress('OpenAI Vision APIで名刺を解析中...');
 
     try {
-      // Resize image for faster OCR
-      const resizedImage = await resizeImage(file);
+      // Call OpenAI OCR API
+      const ocrFormData = new FormData();
+      ocrFormData.append('image', file);
 
-      // Create or reuse worker
-      setOcrProgress('OCR処理中（日本語・英語）...');
-      if (!cachedWorker) {
-        cachedWorker = await createWorker('jpn+eng', 1, {
-          logger: (m) => {
-            if (m.status === 'recognizing text') {
-              setOcrProgress(`OCR処理中: ${Math.round((m.progress || 0) * 100)}%`);
-            }
-          }
-        });
+      const ocrResponse = await fetch('/api/ocr', {
+        method: 'POST',
+        body: ocrFormData
+      });
+
+      const ocrData = await ocrResponse.json();
+
+      if (!ocrData.success) {
+        alert('OCR処理に失敗しました: ' + (ocrData.error || '不明なエラー'));
+        return;
       }
 
-      const { data: { text } } = await cachedWorker.recognize(resizedImage);
-      // Don't terminate worker - reuse it for next upload
-
-      // Extract structured information
-      setOcrProgress('情報を抽出中...');
-      const cardInfo = extractBusinessCardInfo(text);
+      const cardInfo = ocrData.cardInfo;
 
       // Upload to server
       setOcrProgress('サーバーに保存中...');
@@ -124,7 +89,7 @@ export default function Dashboard() {
       formData.append('mobile', cardInfo.mobile || '');
       formData.append('address', cardInfo.address || '');
       formData.append('website', cardInfo.website || '');
-      formData.append('rawText', text);
+      formData.append('rawText', ocrData.rawText || '');
 
       const response = await fetch('/api/cards', {
         method: 'POST',
