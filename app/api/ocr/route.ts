@@ -92,7 +92,7 @@ JSONのみを返してください。追加の説明は不要です。`,
           ],
         },
       ],
-      max_tokens: 1000,
+      max_completion_tokens: 1000, // GPT-5 mini uses max_completion_tokens instead of max_tokens
       temperature: 0.1,
     });
 
