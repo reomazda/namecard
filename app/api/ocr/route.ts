@@ -58,9 +58,9 @@ export async function POST(request: NextRequest) {
     console.log('File type:', file.type, '-> Using MIME type:', mimeType, 'File name:', file.name);
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    // Call OpenAI Vision API with GPT-5 mini
+    // Call OpenAI Vision API with GPT-5.1 (reasoning model)
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
+      model: 'gpt-5.1-2025-11-13',
       messages: [
         {
           role: 'user',
@@ -92,8 +92,8 @@ JSONのみを返してください。追加の説明は不要です。`,
           ],
         },
       ],
-      max_completion_tokens: 1000, // GPT-5 mini uses max_completion_tokens instead of max_tokens
-      temperature: 0.1,
+      // Limit output length; GPT-5.1 ignores temperature/top_p
+      max_tokens: 1000,
     });
 
     const content = response.choices[0]?.message?.content || '{}';
