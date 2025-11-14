@@ -70,7 +70,15 @@ export default function Dashboard() {
       const ocrData = await ocrResponse.json();
 
       if (!ocrData.success) {
-        alert('OCR処理に失敗しました: ' + (ocrData.error || '不明なエラー'));
+        const errorDetails = [
+          'OCR処理に失敗しました',
+          `エラー: ${ocrData.error || '不明なエラー'}`,
+          ocrData.details ? `詳細: ${ocrData.details}` : '',
+          ocrData.apiError ? `API Error: ${JSON.stringify(ocrData.apiError)}` : ''
+        ].filter(Boolean).join('\n');
+
+        console.error('OCR Error:', ocrData);
+        alert(errorDetails);
         return;
       }
 

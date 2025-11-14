@@ -7,6 +7,14 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if OpenAI API key is configured
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured', details: 'OPENAI_API_KEY environment variable is missing' },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('image') as File;
 
@@ -89,10 +97,22 @@ JSONのみを返してください。追加の説明は不要です。`,
       rawText: content,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing OCR:', error);
+
+    // Log detailed error information
+    if (error.response) {
+      console.error('OpenAI API Error:', error.response.status, error.response.data);
+    }
+
     return NextResponse.json(
-      { error: 'Failed to process image', details: (error as Error).message },
+      {
+        error: 'Failed to process image',
+        details: error.message || 'Unknown error',
+        type: error.type || 'unknown',
+        statusCode: error.response?.status,
+        apiError: error.response?.data
+      },
       { status: 500 }
     );
   }
