@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    unoptimized: false,
+    unoptimized: true, // Disable image optimization for Vercel + S3
   },
   experimental: {
     serverActions: {
