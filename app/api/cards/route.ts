@@ -58,8 +58,9 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Generate public URL for the uploaded image
-    const imageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${filename}`;
+    // Generate public URL for the uploaded image (URL encode the filename)
+    const encodedFilename = encodeURIComponent(filename).replace(/%2F/g, '/');
+    const imageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${encodedFilename}`;
 
     // For MVP, we'll use a default user ID
     // In production, this would come from the authenticated session

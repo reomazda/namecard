@@ -49,7 +49,21 @@
 
 （`your-bucket-name`を実際のバケット名に置き換える）
 
-9. IAMユーザーを作成してアクセスキーを取得:
+9. CORS設定を追加（重要！）:
+   - 「アクセス許可」タブ→「Cross-Origin Resource Sharing (CORS)」で以下を追加:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": ["ETag"]
+  }
+]
+```
+
+10. IAMユーザーを作成してアクセスキーを取得:
    - https://console.aws.amazon.com/iam にアクセス
    - 「ユーザー」→「ユーザーを追加」
    - ユーザー名を入力（例: cardconnect-uploader）
