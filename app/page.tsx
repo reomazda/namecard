@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import heic2any from 'heic2any';
 
 interface BusinessCard {
   id: string;
@@ -51,13 +52,40 @@ export default function Dashboard() {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    let file = event.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    setOcrProgress('GPT-5 miniで名刺を解析中...');
 
     try {
+      // Convert HEIC to JPEG if needed
+      if (file.type === 'image/heic' || file.type === 'image/heif' ||
+          file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+        setOcrProgress('HEIC画像をJPEGに変換中...');
+        try {
+          const convertedBlob = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.9,
+          });
+
+          // heic2any returns Blob or Blob[], handle both cases
+          const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
+          // Create a new File object from the converted Blob
+          file = new File([blob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), {
+            type: 'image/jpeg',
+          });
+          console.log('HEIC converted to JPEG successfully');
+        } catch (conversionError) {
+          console.error('HEIC conversion failed:', conversionError);
+          alert('HEIC画像の変換に失敗しました。別の画像を試してください。');
+          return;
+        }
+      }
+
+      setOcrProgress('GPT-5 miniで名刺を解析中...');
+
       // Call OpenAI OCR API
       const ocrFormData = new FormData();
       ocrFormData.append('image', file);
@@ -220,7 +248,7 @@ export default function Dashboard() {
             <div className="text-6xl mb-4">📇</div>
             <h2 className="text-2xl font-semibold text-gray-700 mb-2">名刺がまだありません</h2>
             <p className="text-gray-500">「名刺を追加」ボタンから名刺をアップロードしてください</p>
-            <p className="text-gray-400 text-sm mt-2">※初回のOCR処理は言語データのダウンロードに時間がかかる場合があります</p>
+            <p className="text-gray-400 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

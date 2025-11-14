@@ -44,6 +44,10 @@ export async function POST(request: NextRequest) {
         mimeType = 'image/webp';
       } else if (fileName.endsWith('.gif')) {
         mimeType = 'image/gif';
+      } else if (fileName.endsWith('.heic') || fileName.endsWith('.heif')) {
+        // HEIC should be converted to JPEG on client-side, but handle it just in case
+        mimeType = 'image/jpeg';
+        console.warn('HEIC file detected - should have been converted to JPEG on client-side');
       } else {
         // Default to jpeg if unable to determine
         mimeType = 'image/jpeg';
