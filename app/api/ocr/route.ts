@@ -29,7 +29,30 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const base64Image = buffer.toString('base64');
-    const dataUrl = `data:${file.type};base64,${base64Image}`;
+
+    // Ensure valid image MIME type
+    let mimeType = file.type;
+
+    // If MIME type is missing or invalid, try to infer from file name
+    if (!mimeType || !mimeType.startsWith('image/')) {
+      const fileName = file.name.toLowerCase();
+      if (fileName.endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (fileName.endsWith('.webp')) {
+        mimeType = 'image/webp';
+      } else if (fileName.endsWith('.gif')) {
+        mimeType = 'image/gif';
+      } else {
+        // Default to jpeg if unable to determine
+        mimeType = 'image/jpeg';
+      }
+      console.warn(`Invalid MIME type detected: "${file.type}", inferred "${mimeType}" from filename: ${file.name}`);
+    }
+
+    console.log('File type:', file.type, '-> Using MIME type:', mimeType, 'File name:', file.name);
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     // Call OpenAI Vision API with GPT-5 mini
     const response = await openai.chat.completions.create({
@@ -59,6 +82,7 @@ JSONのみを返してください。追加の説明は不要です。`,
               type: 'image_url',
               image_url: {
                 url: dataUrl,
+                detail: 'high', // Use high detail for better OCR accuracy
               },
             },
           ],
