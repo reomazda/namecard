@@ -16,6 +16,7 @@ interface BusinessCard {
   address?: string;
   website?: string;
   imagePath?: string;
+  backImagePath?: string;
   notes?: string;
   createdAt: string;
 }
@@ -28,6 +29,13 @@ export default function Dashboard() {
   const [ocrProgress, setOcrProgress] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
+  const [showBackImageUpload, setShowBackImageUpload] = useState(false);
+  const [frontImageFile, setFrontImageFile] = useState<File | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<BusinessCard[]>([]);
+  const [searchExplanation, setSearchExplanation] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -55,8 +63,6 @@ export default function Dashboard() {
     let file = event.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
-
     try {
       // Convert HEIC to JPEG if needed
       if (file.type === 'image/heic' || file.type === 'image/heif' ||
@@ -83,14 +89,39 @@ export default function Dashboard() {
         } catch (conversionError) {
           console.error('HEIC conversion failed:', conversionError);
           alert('HEIC画像の変換に失敗しました。別の画像を試してください。');
+          setOcrProgress('');
           return;
         }
       }
 
+      // Save front image and show back image upload modal
+      setFrontImageFile(file);
+      setShowBackImageUpload(true);
+      setOcrProgress('');
+    } catch (error) {
+      console.error('Error processing front image:', error);
+      alert('画像処理エラーが発生しました: ' + (error as Error).message);
+      setOcrProgress('');
+    }
+  };
+
+  const handleBackImageUpload = async (backFile: File | null) => {
+    if (!frontImageFile) {
+      alert('表の画像が見つかりません');
+      return;
+    }
+
+    setIsUploading(true);
+    setShowBackImageUpload(false);
+
+    try {
       // Upload to server without OCR
       setOcrProgress('サーバーに保存中...');
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', frontImageFile);
+      if (backFile) {
+        formData.append('backImage', backFile);
+      }
 
       const response = await fetch('/api/cards', {
         method: 'POST',
@@ -102,6 +133,7 @@ export default function Dashboard() {
       if (data.success) {
         await fetchCards();
         setOcrProgress('');
+        setFrontImageFile(null);
         alert('名刺が正常にアップロードされました！カード詳細からOCRを実行できます。');
       } else {
         const errorDetails = [
@@ -246,6 +278,41 @@ export default function Dashboard() {
     }
   };
 
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      alert('検索クエリを入力してください');
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchResults([]);
+    setSearchExplanation('');
+
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query: searchQuery })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSearchResults(data.results);
+        setSearchExplanation(data.explanation);
+      } else {
+        alert('検索に失敗しました: ' + (data.error || '不明なエラー'));
+      }
+    } catch (error) {
+      console.error('Error searching:', error);
+      alert('検索エラーが発生しました: ' + (error as Error).message);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('authenticated');
     router.push('/login');
@@ -263,6 +330,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-indigo-600">CardConnect</h1>
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowSearchModal(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-md"
+              >
+                🔍 AI検索
+              </button>
               <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-md">
                 {isUploading ? ocrProgress || '処理中...' : '+ 名刺を追加'}
                 <input
@@ -302,9 +375,9 @@ export default function Dashboard() {
         {cards.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📇</div>
-            <h2 className="text-2xl font-semibold text-gray-700 mb-2">名刺がまだありません</h2>
-            <p className="text-gray-500">「名刺を追加」ボタンから名刺をアップロードしてください</p>
-            <p className="text-gray-400 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">名刺がまだありません</h2>
+            <p className="text-gray-900">「名刺を追加」ボタンから名刺をアップロードしてください</p>
+            <p className="text-gray-700 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -325,20 +398,20 @@ export default function Dashboard() {
                   </div>
                 )}
                 <div className="p-4">
-                  <h3 className="font-bold text-lg text-gray-800 mb-1">
+                  <h3 className="font-bold text-lg text-gray-900 mb-1">
                     {card.fullName || '名前なし'}
                   </h3>
                   {card.position && (
-                    <p className="text-sm text-gray-600">{card.position}</p>
+                    <p className="text-sm text-gray-900">{card.position}</p>
                   )}
                   {card.companyName && (
-                    <p className="text-sm text-gray-700 font-medium mt-2">{card.companyName}</p>
+                    <p className="text-sm text-gray-900 font-medium mt-2">{card.companyName}</p>
                   )}
                   {card.email && (
                     <p className="text-sm text-indigo-600 mt-2">{card.email}</p>
                   )}
                   {card.phone && (
-                    <p className="text-sm text-gray-600 mt-1">{card.phone}</p>
+                    <p className="text-sm text-gray-900 mt-1">{card.phone}</p>
                   )}
                 </div>
               </div>
@@ -347,13 +420,197 @@ export default function Dashboard() {
         )}
       </main>
 
+      {/* Back Image Upload Modal */}
+      {showBackImageUpload && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">裏面の画像</h2>
+            <p className="text-gray-900 mb-4">
+              裏面の画像もアップロードしますか？<br />
+              （スキップも可能です）
+            </p>
+
+            {frontImageFile && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-500 mb-2">表面の画像:</p>
+                <div className="relative h-40 bg-gray-100 rounded-lg">
+                  <Image
+                    src={URL.createObjectURL(frontImageFile)}
+                    alt="表面"
+                    fill
+                    className="object-contain p-2"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors text-center">
+                裏面の画像を選択
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={async (e) => {
+                    let backFile = e.target.files?.[0];
+                    if (!backFile) return;
+
+                    // Convert HEIC to JPEG if needed
+                    if (backFile.type === 'image/heic' || backFile.type === 'image/heif' ||
+                        backFile.name.toLowerCase().endsWith('.heic') || backFile.name.toLowerCase().endsWith('.heif')) {
+                      try {
+                        const heic2any = (await import('heic2any')).default;
+                        const convertedBlob = await heic2any({
+                          blob: backFile,
+                          toType: 'image/jpeg',
+                          quality: 0.9,
+                        });
+                        const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                        backFile = new File([blob], backFile.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), {
+                          type: 'image/jpeg',
+                        });
+                      } catch (conversionError) {
+                        console.error('HEIC conversion failed:', conversionError);
+                        alert('HEIC画像の変換に失敗しました。');
+                        return;
+                      }
+                    }
+
+                    handleBackImageUpload(backFile);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <button
+                onClick={() => handleBackImageUpload(null)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                スキップして保存
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackImageUpload(false);
+                  setFrontImageFile(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 px-4 py-2 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Modal */}
+      {showSearchModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">AI検索 (Claude Sonnet 4.5)</h2>
+                <button
+                  onClick={() => {
+                    setShowSearchModal(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    setSearchExplanation('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-gray-900 mb-4">
+                  例: 「銀行業界につながってそうな人」「東京にいる人」「エンジニア」など
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isSearching) {
+                        handleSearch();
+                      }
+                    }}
+                    placeholder="検索クエリを入力..."
+                    className="flex-1 px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400"
+                    disabled={isSearching}
+                  />
+                  <button
+                    onClick={handleSearch}
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {isSearching ? '検索中...' : '検索'}
+                  </button>
+                </div>
+              </div>
+
+              {searchExplanation && (
+                <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">検索結果の説明:</p>
+                  <p className="text-sm text-blue-800">{searchExplanation}</p>
+                </div>
+              )}
+
+              {searchResults.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {searchResults.map((card) => (
+                    <div
+                      key={card.id}
+                      onClick={() => {
+                        setSelectedCard(card);
+                        setShowSearchModal(false);
+                      }}
+                      className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-indigo-500 cursor-pointer transition-colors"
+                    >
+                      {card.imagePath && (
+                        <div className="relative h-32 bg-gray-100 rounded mb-3">
+                          <Image
+                            src={card.imagePath}
+                            alt={card.fullName || '名刺'}
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </div>
+                      )}
+                      <h3 className="font-bold text-lg text-gray-900 mb-1">
+                        {card.fullName || '名前なし'}
+                      </h3>
+                      {card.position && (
+                        <p className="text-sm text-gray-900">{card.position}</p>
+                      )}
+                      {card.companyName && (
+                        <p className="text-sm text-gray-900 font-medium mt-1">{card.companyName}</p>
+                      )}
+                      {card.email && (
+                        <p className="text-sm text-indigo-600 mt-1">{card.email}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !isSearching && searchQuery && (
+                  <div className="text-center py-10 text-gray-500">
+                    検索結果が見つかりませんでした
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
       {selectedCard && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedCard(null)}>
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">名刺詳細</h2>
+                <h2 className="text-2xl font-bold text-gray-900">名刺詳細</h2>
                 <button
                   onClick={() => setSelectedCard(null)}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -362,16 +619,34 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {selectedCard.imagePath && (
-                <div className="relative h-64 bg-gray-100 rounded-lg mb-6">
-                  <Image
-                    src={selectedCard.imagePath}
-                    alt={selectedCard.fullName || '名刺'}
-                    fill
-                    className="object-contain p-4"
-                  />
-                </div>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {selectedCard.imagePath && (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">表面</p>
+                    <div className="relative h-64 bg-gray-100 rounded-lg">
+                      <Image
+                        src={selectedCard.imagePath}
+                        alt={selectedCard.fullName || '名刺 表面'}
+                        fill
+                        className="object-contain p-4"
+                      />
+                    </div>
+                  </div>
+                )}
+                {selectedCard.backImagePath && (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">裏面</p>
+                    <div className="relative h-64 bg-gray-100 rounded-lg">
+                      <Image
+                        src={selectedCard.backImagePath}
+                        alt={selectedCard.fullName || '名刺 裏面'}
+                        fill
+                        className="object-contain p-4"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {isEditing ? (
                 <div className="space-y-4">
@@ -437,25 +712,25 @@ export default function Dashboard() {
                   {selectedCard.fullName && (
                     <div>
                       <span className="font-semibold text-gray-700">氏名: </span>
-                      <span>{selectedCard.fullName}</span>
+                      <span className="text-gray-900">{selectedCard.fullName}</span>
                     </div>
                   )}
                   {selectedCard.companyName && (
                     <div>
                       <span className="font-semibold text-gray-700">会社: </span>
-                      <span>{selectedCard.companyName}</span>
+                      <span className="text-gray-900">{selectedCard.companyName}</span>
                     </div>
                   )}
                   {selectedCard.department && (
                     <div>
                       <span className="font-semibold text-gray-700">部署: </span>
-                      <span>{selectedCard.department}</span>
+                      <span className="text-gray-900">{selectedCard.department}</span>
                     </div>
                   )}
                   {selectedCard.position && (
                     <div>
                       <span className="font-semibold text-gray-700">役職: </span>
-                      <span>{selectedCard.position}</span>
+                      <span className="text-gray-900">{selectedCard.position}</span>
                     </div>
                   )}
                   {selectedCard.email && (
@@ -477,13 +752,13 @@ export default function Dashboard() {
                   {selectedCard.mobile && (
                     <div>
                       <span className="font-semibold text-gray-700">携帯: </span>
-                      <span>{selectedCard.mobile}</span>
+                      <span className="text-gray-900">{selectedCard.mobile}</span>
                     </div>
                   )}
                   {selectedCard.address && (
                     <div>
                       <span className="font-semibold text-gray-700">住所: </span>
-                      <span>{selectedCard.address}</span>
+                      <span className="text-gray-900">{selectedCard.address}</span>
                     </div>
                   )}
                   {selectedCard.website && (
@@ -497,7 +772,7 @@ export default function Dashboard() {
                   {selectedCard.notes && (
                     <div>
                       <span className="font-semibold text-gray-700">メモ: </span>
-                      <p className="mt-1 text-gray-600">{selectedCard.notes}</p>
+                      <p className="mt-1 text-gray-900">{selectedCard.notes}</p>
                     </div>
                   )}
 
