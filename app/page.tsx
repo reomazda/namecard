@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isRunningOcr, setIsRunningOcr] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -86,48 +87,10 @@ export default function Dashboard() {
         }
       }
 
-      setOcrProgress('GPT-5 nanoで名刺を解析中...');
-
-      // Call OpenAI OCR API
-      const ocrFormData = new FormData();
-      ocrFormData.append('image', file);
-
-      const ocrResponse = await fetch('/api/ocr', {
-        method: 'POST',
-        body: ocrFormData
-      });
-
-      const ocrData = await ocrResponse.json();
-
-      if (!ocrData.success) {
-        const errorDetails = [
-          'OCR処理に失敗しました',
-          `エラー: ${ocrData.error || '不明なエラー'}`,
-          ocrData.details ? `詳細: ${ocrData.details}` : '',
-          ocrData.apiError ? `API Error: ${JSON.stringify(ocrData.apiError)}` : ''
-        ].filter(Boolean).join('\n');
-
-        console.error('OCR Error:', ocrData);
-        alert(errorDetails);
-        return;
-      }
-
-      const cardInfo = ocrData.cardInfo;
-
-      // Upload to server
+      // Upload to server without OCR
       setOcrProgress('サーバーに保存中...');
       const formData = new FormData();
       formData.append('image', file);
-      formData.append('fullName', cardInfo.fullName || '');
-      formData.append('companyName', cardInfo.companyName || '');
-      formData.append('department', cardInfo.department || '');
-      formData.append('position', cardInfo.position || '');
-      formData.append('email', cardInfo.email || '');
-      formData.append('phone', cardInfo.phone || '');
-      formData.append('mobile', cardInfo.mobile || '');
-      formData.append('address', cardInfo.address || '');
-      formData.append('website', cardInfo.website || '');
-      formData.append('rawText', ocrData.rawText || '');
 
       const response = await fetch('/api/cards', {
         method: 'POST',
@@ -139,7 +102,7 @@ export default function Dashboard() {
       if (data.success) {
         await fetchCards();
         setOcrProgress('');
-        alert('名刺が正常にアップロードされました！');
+        alert('名刺が正常にアップロードされました！カード詳細からOCRを実行できます。');
       } else {
         const errorDetails = [
           'アップロードに失敗しました',
@@ -197,6 +160,89 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error updating card:', error);
       alert('更新エラーが発生しました');
+    }
+  };
+
+  const handleOcr = async (card: BusinessCard) => {
+    if (!card.imagePath) {
+      alert('画像が見つかりません');
+      return;
+    }
+
+    setIsRunningOcr(true);
+    setOcrProgress('Claude Sonnet 4.5で名刺を解析中...');
+
+    try {
+      // Fetch the image from S3
+      const imageResponse = await fetch(card.imagePath);
+      const imageBlob = await imageResponse.blob();
+
+      // Create FormData and append the image
+      const formData = new FormData();
+      formData.append('image', imageBlob, 'card.jpg');
+
+      // Call OCR API
+      const ocrResponse = await fetch('/api/ocr', {
+        method: 'POST',
+        body: formData
+      });
+
+      const ocrData = await ocrResponse.json();
+
+      if (!ocrData.success) {
+        const errorDetails = [
+          'OCR処理に失敗しました',
+          `エラー: ${ocrData.error || '不明なエラー'}`,
+          ocrData.details ? `詳細: ${ocrData.details}` : '',
+          ocrData.apiError ? `API Error: ${JSON.stringify(ocrData.apiError)}` : ''
+        ].filter(Boolean).join('\n');
+
+        console.error('OCR Error:', ocrData);
+        alert(errorDetails);
+        return;
+      }
+
+      const cardInfo = ocrData.cardInfo;
+
+      // Update card with OCR data
+      setOcrProgress('カード情報を更新中...');
+      const updateResponse = await fetch(`/api/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fullName: cardInfo.fullName,
+          companyName: cardInfo.companyName,
+          department: cardInfo.department,
+          position: cardInfo.position,
+          email: cardInfo.email,
+          phone: cardInfo.phone,
+          mobile: cardInfo.mobile,
+          address: cardInfo.address,
+          website: cardInfo.website,
+          rawText: ocrData.rawText,
+          ocrJson: JSON.stringify(cardInfo)
+        })
+      });
+
+      const updateData = await updateResponse.json();
+
+      if (updateData.success) {
+        await fetchCards();
+        // Update selected card with new data
+        setSelectedCard(updateData.card);
+        setOcrProgress('');
+        alert('OCR処理が完了しました！');
+      } else {
+        alert('カード情報の更新に失敗しました');
+      }
+    } catch (error) {
+      console.error('Error running OCR:', error);
+      alert('OCR処理エラーが発生しました: ' + (error as Error).message);
+    } finally {
+      setIsRunningOcr(false);
+      setOcrProgress('');
     }
   };
 
@@ -455,19 +501,28 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-4 border-t">
+                  <div className="flex flex-col gap-2 pt-4 border-t">
                     <button
-                      onClick={() => setIsEditing(true)}
-                      className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+                      onClick={() => handleOcr(selectedCard)}
+                      disabled={isRunningOcr || !selectedCard.imagePath}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      編集
+                      {isRunningOcr ? ocrProgress : 'OCR実行 (Claude Sonnet 4.5)'}
                     </button>
-                    <button
-                      onClick={() => handleDelete(selectedCard.id)}
-                      className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-                    >
-                      削除
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+                      >
+                        編集
+                      </button>
+                      <button
+                        onClick={() => handleDelete(selectedCard.id)}
+                        className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+                      >
+                        削除
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

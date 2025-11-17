@@ -53,7 +53,9 @@ export async function PATCH(
         fax: body.fax,
         address: body.address,
         website: body.website,
-        notes: body.notes
+        notes: body.notes,
+        rawText: body.rawText,
+        ocrJson: body.ocrJson
       }
     });
 

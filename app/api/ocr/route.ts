@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    // Check if Claude API key is configured
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured', details: 'OPENAI_API_KEY environment variable is missing' },
+        { error: 'Claude API key not configured', details: 'ANTHROPIC_API_KEY environment variable is missing' },
         { status: 500 }
       );
     }
@@ -56,15 +56,36 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('File type:', file.type, '-> Using MIME type:', mimeType, 'File name:', file.name);
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    // Call OpenAI Vision API with GPT-5 nano (fastest and most cost-efficient)
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+    // Determine media type for Claude API
+    let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+    if (mimeType === 'image/png') {
+      mediaType = 'image/png';
+    } else if (mimeType === 'image/gif') {
+      mediaType = 'image/gif';
+    } else if (mimeType === 'image/webp') {
+      mediaType = 'image/webp';
+    } else {
+      // Default to jpeg for all other types
+      mediaType = 'image/jpeg';
+    }
+
+    // Call Claude Vision API with Sonnet 4.5
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 1024,
       messages: [
         {
           role: 'user',
           content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: base64Image,
+              },
+            },
             {
               type: 'text',
               text: `この名刺画像から以下の情報をJSON形式で抽出してください。日本語または英語の名前のみを抽出し、中国語名は除外してください。
@@ -82,22 +103,14 @@ export async function POST(request: NextRequest) {
 
 JSONのみを返してください。追加の説明は不要です。`,
             },
-            {
-              type: 'image_url',
-              image_url: {
-                url: dataUrl,
-                detail: 'high', // Use high detail for better OCR accuracy
-              },
-            },
           ],
         },
       ],
-      max_completion_tokens: 1000,
-      temperature: 1.0, // Fixed at 1.0 for consistent results
     });
 
-    const content = response.choices[0]?.message?.content || '{}';
-    
+    // Extract text content from Claude response
+    const content = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
+
     // Extract JSON from the response
     let cardInfo;
     try {
@@ -129,8 +142,8 @@ JSONのみを返してください。追加の説明は不要です。`,
     console.error('Error processing OCR:', error);
 
     // Log detailed error information
-    if (error.response) {
-      console.error('OpenAI API Error:', error.response.status, error.response.data);
+    if (error.status) {
+      console.error('Claude API Error:', error.status, error.message);
     }
 
     return NextResponse.json(
@@ -138,8 +151,8 @@ JSONのみを返してください。追加の説明は不要です。`,
         error: 'Failed to process image',
         details: error.message || 'Unknown error',
         type: error.type || 'unknown',
-        statusCode: error.response?.status,
-        apiError: error.response?.data
+        statusCode: error.status,
+        apiError: error.error
       },
       { status: 500 }
     );
