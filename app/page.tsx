@@ -36,28 +36,58 @@ export default function Dashboard() {
   const [searchResults, setSearchResults] = useState<BusinessCard[]>([]);
   const [searchExplanation, setSearchExplanation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
   const router = useRouter();
+
+  const fetchCards = async () => {
+    try {
+      console.log('Fetching cards...');
+      setIsLoadingCards(true);
+      const response = await fetch('/api/cards');
+
+      if (!response.ok) {
+        console.error('Failed to fetch cards:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Cards fetched:', data.cards?.length || 0);
+      setCards(data.cards || []);
+    } catch (error) {
+      console.error('Error fetching cards:', error);
+    } finally {
+      setIsLoadingCards(false);
+    }
+  };
 
   useEffect(() => {
     // Check authentication
     const auth = sessionStorage.getItem('authenticated');
+    console.log('Auth check:', auth);
+
     if (auth === 'true') {
       setIsAuthenticated(true);
+      // Fetch cards after setting authentication
       fetchCards();
     } else {
       router.push('/login');
     }
   }, [router]);
 
-  const fetchCards = async () => {
-    try {
-      const response = await fetch('/api/cards');
-      const data = await response.json();
-      setCards(data.cards || []);
-    } catch (error) {
-      console.error('Error fetching cards:', error);
-    }
-  };
+  // Also fetch cards when component becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isAuthenticated) {
+        console.log('Page visible, refreshing cards...');
+        fetchCards();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     let file = event.target.files?.[0];
@@ -372,7 +402,15 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {cards.length === 0 ? (
+        {isLoadingCards ? (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">⏳</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">名刺を読み込み中...</h2>
+            <div className="mt-4 w-full max-w-md mx-auto bg-gray-200 rounded-full h-2">
+              <div className="bg-indigo-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+            </div>
+          </div>
+        ) : cards.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📇</div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">名刺がまだありません</h2>
