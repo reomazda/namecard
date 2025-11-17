@@ -16,6 +16,7 @@ interface BusinessCard {
   address?: string;
   website?: string;
   imagePath?: string;
+  backImagePath?: string;
   notes?: string;
   createdAt: string;
 }
@@ -29,6 +30,8 @@ export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showBackImageUpload, setShowBackImageUpload] = useState(false);
+  const [frontImageFile, setFrontImageFile] = useState<File | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BusinessCard[]>([]);
   const [searchExplanation, setSearchExplanation] = useState('');
@@ -90,8 +93,6 @@ export default function Dashboard() {
     let file = event.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
-
     try {
       // Convert HEIC to JPEG if needed
       if (file.type === 'image/heic' || file.type === 'image/heif' ||
@@ -118,14 +119,39 @@ export default function Dashboard() {
         } catch (conversionError) {
           console.error('HEIC conversion failed:', conversionError);
           alert('HEIC画像の変換に失敗しました。別の画像を試してください。');
+          setOcrProgress('');
           return;
         }
       }
 
+      // Save front image and show back image upload modal
+      setFrontImageFile(file);
+      setShowBackImageUpload(true);
+      setOcrProgress('');
+    } catch (error) {
+      console.error('Error processing front image:', error);
+      alert('画像処理エラーが発生しました: ' + (error as Error).message);
+      setOcrProgress('');
+    }
+  };
+
+  const handleBackImageUpload = async (backFile: File | null) => {
+    if (!frontImageFile) {
+      alert('表の画像が見つかりません');
+      return;
+    }
+
+    setIsUploading(true);
+    setShowBackImageUpload(false);
+
+    try {
       // Upload to server without OCR
       setOcrProgress('サーバーに保存中...');
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', frontImageFile);
+      if (backFile) {
+        formData.append('backImage', backFile);
+      }
 
       const response = await fetch('/api/cards', {
         method: 'POST',
@@ -137,6 +163,7 @@ export default function Dashboard() {
       if (data.success) {
         await fetchCards();
         setOcrProgress('');
+        setFrontImageFile(null);
         alert('名刺が正常にアップロードされました！カード詳細からOCRを実行できます。');
       } else {
         const errorDetails = [
@@ -431,6 +458,87 @@ export default function Dashboard() {
         )}
       </main>
 
+      {/* Back Image Upload Modal */}
+      {showBackImageUpload && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">裏面の画像</h2>
+            <p className="text-gray-900 mb-4">
+              裏面の画像もアップロードしますか？<br />
+              （スキップも可能です）
+            </p>
+
+            {frontImageFile && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-500 mb-2">表面の画像:</p>
+                <div className="relative h-40 bg-gray-100 rounded-lg">
+                  <Image
+                    src={URL.createObjectURL(frontImageFile)}
+                    alt="表面"
+                    fill
+                    className="object-contain p-2"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors text-center">
+                裏面の画像を選択
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={async (e) => {
+                    let backFile = e.target.files?.[0];
+                    if (!backFile) return;
+
+                    // Convert HEIC to JPEG if needed
+                    if (backFile.type === 'image/heic' || backFile.type === 'image/heif' ||
+                        backFile.name.toLowerCase().endsWith('.heic') || backFile.name.toLowerCase().endsWith('.heif')) {
+                      try {
+                        const heic2any = (await import('heic2any')).default;
+                        const convertedBlob = await heic2any({
+                          blob: backFile,
+                          toType: 'image/jpeg',
+                          quality: 0.9,
+                        });
+                        const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                        backFile = new File([blob], backFile.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), {
+                          type: 'image/jpeg',
+                        });
+                      } catch (conversionError) {
+                        console.error('HEIC conversion failed:', conversionError);
+                        alert('HEIC画像の変換に失敗しました。');
+                        return;
+                      }
+                    }
+
+                    handleBackImageUpload(backFile);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <button
+                onClick={() => handleBackImageUpload(null)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                スキップして保存
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackImageUpload(false);
+                  setFrontImageFile(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 px-4 py-2 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Modal */}
       {showSearchModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -549,16 +657,34 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {selectedCard.imagePath && (
-                <div className="relative h-64 bg-gray-100 rounded-lg mb-6">
-                  <Image
-                    src={selectedCard.imagePath}
-                    alt={selectedCard.fullName || '名刺'}
-                    fill
-                    className="object-contain p-4"
-                  />
-                </div>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {selectedCard.imagePath && (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">表面</p>
+                    <div className="relative h-64 bg-gray-100 rounded-lg">
+                      <Image
+                        src={selectedCard.imagePath}
+                        alt={selectedCard.fullName || '名刺 表面'}
+                        fill
+                        className="object-contain p-4"
+                      />
+                    </div>
+                  </div>
+                )}
+                {selectedCard.backImagePath && (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">裏面</p>
+                    <div className="relative h-64 bg-gray-100 rounded-lg">
+                      <Image
+                        src={selectedCard.backImagePath}
+                        alt={selectedCard.fullName || '名刺 裏面'}
+                        fill
+                        className="object-contain p-4"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {isEditing ? (
                 <div className="space-y-4">

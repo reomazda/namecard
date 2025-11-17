@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('image') as File;
+    const backFile = formData.get('backImage') as File | null;
 
     // Get OCR data from form data
     const fullName = formData.get('fullName') as string | null;
@@ -44,10 +45,10 @@ export async function POST(request: NextRequest) {
 
     const timestamp = Date.now();
 
-    // Upload image to S3
+    // Upload front image to S3
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filename = `cards/${timestamp}-${file.name}`;
+    const filename = `cards/${timestamp}-front-${file.name}`;
 
     await s3Client.send(
       new PutObjectCommand({
@@ -62,6 +63,26 @@ export async function POST(request: NextRequest) {
     // Generate public URL for the uploaded image (URL encode the filename)
     const encodedFilename = encodeURIComponent(filename).replace(/%2F/g, '/');
     const imageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${encodedFilename}`;
+
+    // Upload back image to S3 if provided
+    let backImageUrl: string | undefined;
+    if (backFile) {
+      const backBytes = await backFile.arrayBuffer();
+      const backBuffer = Buffer.from(backBytes);
+      const backFilename = `cards/${timestamp}-back-${backFile.name}`;
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: backFilename,
+          Body: backBuffer,
+          ContentType: backFile.type,
+        })
+      );
+
+      const encodedBackFilename = encodeURIComponent(backFilename).replace(/%2F/g, '/');
+      backImageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${encodedBackFilename}`;
+    }
 
     // For MVP, we'll use a default user ID
     // In production, this would come from the authenticated session
@@ -93,6 +114,7 @@ export async function POST(request: NextRequest) {
         address: address || undefined,
         website: website || undefined,
         imagePath: imageUrl,
+        backImagePath: backImageUrl,
         rawText: rawText || undefined,
         ocrJson: JSON.stringify({
           fullName,
