@@ -55,7 +55,8 @@ export async function PATCH(
         website: body.website,
         notes: body.notes,
         rawText: body.rawText,
-        ocrJson: body.ocrJson
+        ocrJson: body.ocrJson,
+        status: body.status
       }
     });
 

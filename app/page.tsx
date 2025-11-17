@@ -18,6 +18,7 @@ interface BusinessCard {
   imagePath?: string;
   backImagePath?: string;
   notes?: string;
+  status?: string;
   createdAt: string;
 }
 
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [searchExplanation, setSearchExplanation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingCards, setIsLoadingCards] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const router = useRouter();
 
   const fetchCards = async () => {
@@ -343,6 +345,75 @@ export default function Dashboard() {
     }
   };
 
+  const handleStatusChange = async (cardId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/cards/${cardId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        await fetchCards();
+      }
+    } catch (error) {
+      console.error('Error updating card status:', error);
+      alert('ステータス更新エラーが発生しました');
+    }
+  };
+
+  const handleExportCSV = () => {
+    // CSVヘッダー
+    const headers = [
+      '氏名',
+      '会社名',
+      '部署',
+      '役職',
+      'メールアドレス',
+      '電話番号',
+      '携帯電話',
+      '住所',
+      'ウェブサイト',
+      'ステータス',
+      'メモ',
+      '作成日'
+    ];
+
+    // CSVデータを生成
+    const csvData = cards.map(card => [
+      card.fullName || '',
+      card.companyName || '',
+      card.department || '',
+      card.position || '',
+      card.email || '',
+      card.phone || '',
+      card.mobile || '',
+      card.address || '',
+      card.website || '',
+      card.status || 'new',
+      card.notes || '',
+      new Date(card.createdAt).toLocaleDateString('ja-JP')
+    ]);
+
+    // CSVフォーマット（BOM付きUTF-8）
+    const csvContent = '\uFEFF' + [headers, ...csvData]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    // ダウンロード
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `名刺データ_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('authenticated');
     router.push('/login');
@@ -359,14 +430,43 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-indigo-600">CardConnect</h1>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowSearchModal(true)}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-md"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md"
               >
                 🔍 AI検索
               </button>
-              <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-md">
+              <button
+                onClick={handleExportCSV}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md"
+                disabled={cards.length === 0}
+              >
+                📤 CSV出力
+              </button>
+              <div className="flex bg-gray-200 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📋 リスト
+                </button>
+                <button
+                  onClick={() => setViewMode('kanban')}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    viewMode === 'kanban'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📊 Kanban
+                </button>
+              </div>
+              <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md">
                 {isUploading ? ocrProgress || '処理中...' : '+ 名刺を追加'}
                 <input
                   type="file"
@@ -417,7 +517,7 @@ export default function Dashboard() {
             <p className="text-gray-900">「名刺を追加」ボタンから名刺をアップロードしてください</p>
             <p className="text-gray-700 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
           </div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {cards.map((card) => (
               <div
@@ -454,6 +554,92 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : (
+          // Kanban View
+          <div className="flex gap-6 overflow-x-auto pb-4">
+            {['new', 'followup', 'contacted', 'done'].map((status) => {
+              const statusConfig = {
+                new: { label: '新規', color: 'bg-blue-50 border-blue-200', icon: '✨' },
+                followup: { label: 'フォローアップ', color: 'bg-yellow-50 border-yellow-200', icon: '📌' },
+                contacted: { label: '連絡済み', color: 'bg-green-50 border-green-200', icon: '✅' },
+                done: { label: '完了', color: 'bg-gray-50 border-gray-200', icon: '🎯' }
+              };
+
+              const config = statusConfig[status as keyof typeof statusConfig];
+              const cardsInStatus = cards.filter(card => (card.status || 'new') === status);
+
+              return (
+                <div key={status} className="flex-shrink-0 w-80">
+                  <div className={`${config.color} border-2 rounded-lg p-4`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-lg text-gray-900">
+                        {config.icon} {config.label}
+                      </h3>
+                      <span className="bg-white px-3 py-1 rounded-full text-sm font-semibold text-gray-700">
+                        {cardsInStatus.length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                      {cardsInStatus.map((card) => (
+                        <div
+                          key={card.id}
+                          onClick={() => setSelectedCard(card)}
+                          className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer p-4 border border-gray-200"
+                        >
+                          {card.imagePath && (
+                            <div className="relative h-32 bg-gray-50 rounded mb-3">
+                              <Image
+                                src={card.imagePath}
+                                alt={card.fullName || '名刺'}
+                                fill
+                                className="object-contain p-2"
+                              />
+                            </div>
+                          )}
+                          <h4 className="font-bold text-gray-900 mb-1">
+                            {card.fullName || '名前なし'}
+                          </h4>
+                          {card.companyName && (
+                            <p className="text-sm text-gray-700 mb-1">{card.companyName}</p>
+                          )}
+                          {card.position && (
+                            <p className="text-xs text-gray-600">{card.position}</p>
+                          )}
+
+                          <div className="mt-3 flex gap-1">
+                            {['new', 'followup', 'contacted', 'done'].map((s) => {
+                              if (s === status) return null;
+                              const targetConfig = statusConfig[s as keyof typeof statusConfig];
+                              return (
+                                <button
+                                  key={s}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusChange(card.id, s);
+                                  }}
+                                  className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                  title={`${targetConfig.label}に移動`}
+                                >
+                                  {targetConfig.icon}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+
+                      {cardsInStatus.length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-sm">
+                          カードなし
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
