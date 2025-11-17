@@ -36,7 +36,6 @@ model BusinessCard {
   address     String?
   website     String?
   imagePath   String?
-  backImagePath String?
   rawText     String?
   ocrJson     String?
   fingerprint String?  @unique
