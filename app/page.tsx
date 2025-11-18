@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [searchExplanation, setSearchExplanation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingCards, setIsLoadingCards] = useState(true);
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'kanban'>('cards');
   const router = useRouter();
 
   const fetchCards = async () => {
@@ -446,14 +446,24 @@ export default function Dashboard() {
               </button>
               <div className="flex bg-gray-200 rounded-lg p-1">
                 <button
-                  onClick={() => setViewMode('list')}
+                  onClick={() => setViewMode('cards')}
                   className={`px-3 py-1 rounded-md transition-colors ${
-                    viewMode === 'list'
+                    viewMode === 'cards'
                       ? 'bg-white text-indigo-600 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  📋 リスト
+                  🃏 カード
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    viewMode === 'table'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📊 テーブル
                 </button>
                 <button
                   onClick={() => setViewMode('kanban')}
@@ -463,7 +473,7 @@ export default function Dashboard() {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  📊 Kanban
+                  📋 Kanban
                 </button>
               </div>
               <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md">
@@ -517,7 +527,7 @@ export default function Dashboard() {
             <p className="text-gray-900">「名刺を追加」ボタンから名刺をアップロードしてください</p>
             <p className="text-gray-700 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
           </div>
-        ) : viewMode === 'list' ? (
+        ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {cards.map((card) => (
               <div
@@ -554,6 +564,90 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : viewMode === 'table' ? (
+          // Table View (Spreadsheet-like)
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">画像</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">氏名</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">会社名</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">部署</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">役職</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">メール</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">電話</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">携帯</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ステータス</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">作成日</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {cards.map((card) => (
+                    <tr
+                      key={card.id}
+                      onClick={() => setSelectedCard(card)}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {card.imagePath ? (
+                          <div className="relative w-10 h-10">
+                            <Image
+                              src={card.imagePath}
+                              alt={card.fullName || '名刺'}
+                              fill
+                              className="object-contain rounded"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
+                            🖼️
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {card.fullName || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {card.companyName || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {card.department || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {card.position || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-indigo-600">
+                        {card.email || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {card.phone || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {card.mobile || '-'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          (card.status || 'new') === 'new' ? 'bg-blue-100 text-blue-800' :
+                          (card.status || 'new') === 'followup' ? 'bg-yellow-100 text-yellow-800' :
+                          (card.status || 'new') === 'contacted' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {(card.status || 'new') === 'new' ? '新規' :
+                           (card.status || 'new') === 'followup' ? 'フォローアップ' :
+                           (card.status || 'new') === 'contacted' ? '連絡済み' : '完了'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(card.createdAt).toLocaleDateString('ja-JP')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           // Kanban View
