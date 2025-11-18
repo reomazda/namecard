@@ -45,10 +45,25 @@ export default function Dashboard() {
     try {
       console.log('Fetching cards...');
       setIsLoadingCards(true);
-      const response = await fetch('/api/cards');
+      const userId = sessionStorage.getItem('userId');
+
+      if (!userId) {
+        console.error('No user ID found');
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/cards', {
+        headers: {
+          'x-user-id': userId
+        }
+      });
 
       if (!response.ok) {
         console.error('Failed to fetch cards:', response.status);
+        if (response.status === 401) {
+          router.push('/login');
+        }
         return;
       }
 
@@ -155,8 +170,18 @@ export default function Dashboard() {
         formData.append('backImage', backFile);
       }
 
+      const userId = sessionStorage.getItem('userId');
+      if (!userId) {
+        alert('ログインセッションが切れました。再度ログインしてください。');
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch('/api/cards', {
         method: 'POST',
+        headers: {
+          'x-user-id': userId
+        },
         body: formData
       });
 
@@ -208,10 +233,18 @@ export default function Dashboard() {
 
   const handleUpdate = async (card: BusinessCard) => {
     try {
+      const userId = sessionStorage.getItem('userId');
+      if (!userId) {
+        alert('ログインセッションが切れました。再度ログインしてください。');
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch(`/api/cards/${card.id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-user-id': userId
         },
         body: JSON.stringify(card)
       });
@@ -270,10 +303,18 @@ export default function Dashboard() {
 
       // Update card with OCR data
       setOcrProgress('カード情報を更新中...');
+      const userId = sessionStorage.getItem('userId');
+      if (!userId) {
+        alert('ログインセッションが切れました。再度ログインしてください。');
+        router.push('/login');
+        return;
+      }
+
       const updateResponse = await fetch(`/api/cards/${card.id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-user-id': userId
         },
         body: JSON.stringify({
           fullName: cardInfo.fullName,
@@ -321,10 +362,18 @@ export default function Dashboard() {
     setSearchExplanation('');
 
     try {
+      const userId = sessionStorage.getItem('userId');
+      if (!userId) {
+        alert('ログインセッションが切れました。再度ログインしてください。');
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-user-id': userId
         },
         body: JSON.stringify({ query: searchQuery })
       });
@@ -347,10 +396,18 @@ export default function Dashboard() {
 
   const handleStatusChange = async (cardId: string, newStatus: string) => {
     try {
+      const userId = sessionStorage.getItem('userId');
+      if (!userId) {
+        alert('ログインセッションが切れました。再度ログインしてください。');
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch(`/api/cards/${cardId}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-user-id': userId
         },
         body: JSON.stringify({ status: newStatus })
       });

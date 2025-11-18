@@ -16,6 +16,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user ID from header
+    const userId = request.headers.get('x-user-id');
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please login again' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { query } = body;
 
@@ -26,17 +36,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get all cards for the default user
-    const user = await prisma.user.findUnique({
-      where: { email: 'default@cardconnect.local' }
-    });
-
-    if (!user) {
-      return NextResponse.json({ results: [], message: 'No user found' });
-    }
-
+    // Get all cards for the authenticated user
     const cards = await prisma.businessCard.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: userId },
       orderBy: { createdAt: 'desc' }
     });
 

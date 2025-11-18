@@ -12,6 +12,16 @@ const s3Client = new S3Client({
 
 export async function POST(request: NextRequest) {
   try {
+    // Get user ID from header
+    const userId = request.headers.get('x-user-id');
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please login again' },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('image') as File;
     const backFile = formData.get('backImage') as File | null;
@@ -84,26 +94,10 @@ export async function POST(request: NextRequest) {
       backImageUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${encodedBackFilename}`;
     }
 
-    // For MVP, we'll use a default user ID
-    // In production, this would come from the authenticated session
-    let user = await prisma.user.findUnique({
-      where: { email: 'default@cardconnect.local' }
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'default@cardconnect.local',
-          password: 'placeholder', // Will be replaced with proper auth later
-          username: 'Default User'
-        }
-      });
-    }
-
     // Save business card to database with S3 image URL
     const card = await prisma.businessCard.create({
       data: {
-        ownerId: user.id,
+        ownerId: userId,
         fullName: fullName || undefined,
         companyName: companyName || undefined,
         department: department || undefined,
@@ -157,17 +151,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // For MVP, get all cards for the default user
-    const user = await prisma.user.findUnique({
-      where: { email: 'default@cardconnect.local' }
-    });
+    // Get user ID from header
+    const userId = request.headers.get('x-user-id');
 
-    if (!user) {
-      return NextResponse.json({ cards: [] });
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please login again' },
+        { status: 401 }
+      );
     }
 
     const cards = await prisma.businessCard.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: userId },
       orderBy: { createdAt: 'desc' }
     });
 

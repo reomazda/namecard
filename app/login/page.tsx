@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
@@ -18,16 +19,18 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ email, password })
       });
 
       const data = await response.json();
 
       if (data.success) {
         sessionStorage.setItem('authenticated', 'true');
+        sessionStorage.setItem('userId', data.user.id);
+        sessionStorage.setItem('userEmail', data.user.email);
         router.push('/');
       } else {
-        setError('パスワードが正しくありません');
+        setError(data.error || 'ログインに失敗しました');
       }
     } catch (error) {
       setError('ログインエラーが発生しました');
@@ -43,6 +46,21 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              メールアドレス
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+              placeholder="例: admin@driholdings.ae"
+              required
+            />
+          </div>
+
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               パスワード
@@ -73,7 +91,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>デフォルトパスワード: cardconnect2025</p>
+          <p>各会社のメールアドレスとパスワードでログイン</p>
         </div>
       </div>
     </div>
