@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Dashboard from '@/components/Dashboard';
 
 interface BusinessCard {
   id: string;
@@ -39,7 +38,7 @@ export default function Dashboard() {
   const [searchExplanation, setSearchExplanation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingCards, setIsLoadingCards] = useState(true);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'cards' | 'table' | 'kanban'>('dashboard');
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'kanban'>('cards');
   const router = useRouter();
 
   const fetchCards = async () => {
@@ -504,16 +503,6 @@ export default function Dashboard() {
               </button>
               <div className="flex bg-gray-200 rounded-lg p-1">
                 <button
-                  onClick={() => setViewMode('dashboard')}
-                  className={`px-3 py-1 rounded-md transition-colors ${
-                    viewMode === 'dashboard'
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  📈 ダッシュボード
-                </button>
-                <button
                   onClick={() => setViewMode('cards')}
                   className={`px-3 py-1 rounded-md transition-colors ${
                     viewMode === 'cards'
@@ -588,15 +577,13 @@ export default function Dashboard() {
               <div className="bg-indigo-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
             </div>
           </div>
-        ) : cards.length === 0 && viewMode !== 'dashboard' ? (
+        ) : cards.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📇</div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">名刺がまだありません</h2>
             <p className="text-gray-900">「名刺を追加」ボタンから名刺をアップロードしてください</p>
             <p className="text-gray-700 text-sm mt-2">※HEIC形式（iPhone写真）も自動的にJPEGに変換されます</p>
           </div>
-        ) : viewMode === 'dashboard' ? (
-          <Dashboard />
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {cards.map((card) => (
